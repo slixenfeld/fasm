@@ -10,17 +10,19 @@ include 'win32wx.inc'
 
 	ID_TIMER = 1
 .data
+
+; handle
 	hwnd	       dd	?
 
+; timer
 	timer_text     rb	0xFF
-
 	second	       dd	0
 	minute	       dd	0
 	hour	       dd	0
 
+; thread
 	threadID       dd	1
 	threadHandle   dd	0
-	threadStarted  dd	0
 .code
 
 start:
@@ -30,7 +32,6 @@ start:
 ThreadProc:
 		push	ebp
 		mov	ebp,esp
-		mov	[threadStarted], 1
 		mov	[second],-1
 		mov	[minute],0
 		mov	[hour],0
@@ -69,35 +70,26 @@ proc DialogProc hwnddlg,msg,wparam,lparam
 		xor	eax,eax
 		jmp	.finish
   .wmcommand:
-		cmp	[wparam],BN_CLICKED shl 16 + IDCANCEL
-		je	.wmclose
 		cmp	[wparam],BN_CLICKED shl 16 + ID_START
 		je	.f_start
 		cmp	[wparam],BN_CLICKED shl 16 + ID_STOP
 		je	.f_stop
-		jmp	.processed
+		jmp	.exit
   .f_start:
-		cmp	[threadStarted], 1
-		jne	.thread1
 		invoke	TerminateThread,[threadHandle],0
-  .thread1:
 		invoke	CreateThread,0,0,ThreadProc,0,0,threadID
 		mov	[threadHandle],eax
-		jmp	.processed
+		jmp	.exit
   .f_stop:
-		cmp	[threadStarted], 1
-		jne	.thread2
 		invoke	TerminateThread,[threadHandle],0
-  .thread2:
-		mov	[threadStarted], 0
-		jmp	.processed
+		jmp	.exit
   .wminitdialog:
 		mov	eax,[hwnddlg]
 		mov	[hwnd],eax
-		jmp	.processed
+		jmp	.exit
   .wmclose:
 		invoke	EndDialog,[hwnddlg],0
-  .processed:
+  .exit:
 		mov	eax,1
   .finish:
 		pop	edi esi ebx
