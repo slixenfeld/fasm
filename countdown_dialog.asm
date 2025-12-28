@@ -22,6 +22,7 @@ entry start
                 SND_TYPE_MASK   = 00170007h
 
                 ; IDs
+                ID_WINDOW       =       123
                 ID_STATIC       =       50
                 ID_START        =       200
                 ID_STOP         =       201
@@ -34,6 +35,7 @@ section '.data' data readable writeable
                 hwnd           dd       ?
 
                 timerText      rb       32
+                titleText      rb       64
                 second         dd       0
                 minute         dd       0
                 hour           dd       0
@@ -55,7 +57,11 @@ start:          invoke  GetModuleHandle,0
 
 ThreadProc:     push    ebp
                 mov     ebp,esp
-.loop:          dec     [second]
+
+.loop:          cinvoke wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
+                invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
+                invoke  Sleep,1000
+                dec     [second]
                 cmp     [hour],0
                 jne      .running
                 cmp     [minute],0
@@ -70,12 +76,12 @@ ThreadProc:     push    ebp
                 jne     .skip
                 mov     [minute],59
                 dec     [hour]
-.skip:          invoke  wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
+.skip:          cinvoke wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
                 invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
-                invoke  Sleep,1000
                 jmp     .loop
-.timer_done:
-                invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
+
+.timer_done:    invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
+
                 mov     esp,ebp
                 pop     ebp
                 ret
@@ -94,14 +100,23 @@ proc DialogProc hwnddlg,msg,wparam,lparam
                 xor     eax,eax
                 jmp     .finish
 .wmcommand:     cmp     [wparam],BN_CLICKED shl 16 + ID_5
-                je      .f_5
-                cmp     [wparam],BN_CLICKED shl 16 + ID_10
-                je      .f_10
-                cmp     [wparam],BN_CLICKED shl 16 + ID_15
-                je      .f_15
-                cmp     [wparam],BN_CLICKED shl 16 + ID_20
-                je      .f_20
-
+                jne     .c10
+                mov     eax,5
+                call    SetupTimer
+                jmp     .exit
+.c10:           cmp     [wparam],BN_CLICKED shl 16 + ID_10
+                jne     .c15
+                mov     eax,10
+                call    SetupTimer
+                jmp     .exit
+.c15:           cmp     [wparam],BN_CLICKED shl 16 + ID_15
+                jne     .c20
+                mov     eax,15
+                call    SetupTimer
+                jmp     .exit
+.c20:           cmp     [wparam],BN_CLICKED shl 16 + ID_20
+                mov     eax,20
+                call    SetupTimer
                 jmp     .exit
 
 .wmpaint:       invoke  BeginPaint,[hwnd],ps
@@ -112,29 +127,17 @@ proc DialogProc hwnddlg,msg,wparam,lparam
 .p3:            invoke  EndPaint, [hwnd], ps
                 jmp     .exit
 
-.f_5:           mov     eax,5
-                call    SetupTimer
-                jmp     .exit
-
-.f_10:          mov     eax,10
-                call    SetupTimer
-                jmp     .exit
-
-.f_15:          mov     eax,15
-                call    SetupTimer
-                jmp     .exit
-
-.f_20:          mov     eax,20
-                call    SetupTimer
-                jmp     .exit
-
 .wminitdialog:  mov     eax,[hwnddlg]
                 mov     [hwnd],eax
                 jmp     .exit
+
 .wmclose:       invoke  EndDialog,[hwnddlg],0
 .exit:          mov     eax,1
 .finish:        pop     edi esi ebx
                 ret
+
+
+
 endp
 
 ; ==============
@@ -149,6 +152,8 @@ SetupTimer:     mov     [hour],0
                 invoke  CreateThread,0,0,ThreadProc,0,0,threadID
                 mov     [hThread],eax
                 mov     [timer_running],TRUE
+                cinvoke wsprintf,titleText,'%d minutes',[minute]
+                invoke  SetWindowText,[hwnd],titleText
                 ret
 
 section '.idata' import data readable writeable
@@ -168,7 +173,7 @@ include 'api/gdi32.inc'
 section '.rsrc' resource data readable
 
     directory RT_DIALOG,dialogs
-    resource dialogs,123,LANG_ENGLISH+SUBLANG_DEFAULT,demonstration
+    resource dialogs,ID_WINDOW,LANG_ENGLISH+SUBLANG_DEFAULT,demonstration
 
     dialog demonstration,   'Countdown'                       ,600,300,130,50,      WS_CAPTION+WS_POPUP+WS_SYSMENU+DS_MODALFRAME
         dialogitem 'BUTTON','5 min'               ,ID_5       ,5,30,30,15,          WS_VISIBLE+WS_TABSTOP+BS_DEFPUSHBUTTON
