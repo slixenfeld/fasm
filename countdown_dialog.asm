@@ -33,7 +33,7 @@ entry start
 section '.data' data readable writeable
                 hwnd           dd       ?
 
-                timerText      rb       0xFF
+                timerText      rb       32
                 second         dd       0
                 minute         dd       0
                 hour           dd       0
@@ -70,14 +70,12 @@ ThreadProc:     push    ebp
                 jne     .skip
                 mov     [minute],59
                 dec     [hour]
-.skip:
-                invoke  wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
-                invoke  InvalidateRect,[hwnd],NULL,1
-
+.skip:          invoke  wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
+                invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
                 invoke  Sleep,1000
                 jmp     .loop
 .timer_done:
-                invoke  PlaySound, sound, NULL, SND_ASYNC or SND_FILENAME
+                invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
                 mov     esp,ebp
                 pop     ebp
                 ret
@@ -95,8 +93,7 @@ proc DialogProc hwnddlg,msg,wparam,lparam
                 je      .wmclose
                 xor     eax,eax
                 jmp     .finish
-.wmcommand:
-                cmp     [wparam],BN_CLICKED shl 16 + ID_5
+.wmcommand:     cmp     [wparam],BN_CLICKED shl 16 + ID_5
                 je      .f_5
                 cmp     [wparam],BN_CLICKED shl 16 + ID_10
                 je      .f_10
@@ -107,13 +104,12 @@ proc DialogProc hwnddlg,msg,wparam,lparam
 
                 jmp     .exit
 
-.wmpaint:       invoke  BeginPaint, [hwnd], ps
+.wmpaint:       invoke  BeginPaint,[hwnd],ps
                 cmp     [timer_running],TRUE
                 jne     .p3
-                mov     [hdc], eax
-                invoke  TextOut, [hdc], 5, 5, timerText,15
-.p3:
-                invoke  EndPaint, [hwnd], ps
+                mov     [hdc],eax
+                invoke  TextOut,[hdc],5,5,timerText,15
+.p3:            invoke  EndPaint, [hwnd], ps
                 jmp     .exit
 
 .f_5:           mov     eax,5
