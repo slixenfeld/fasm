@@ -3,141 +3,164 @@
 format PE GUI 4.0
 include 'win32wx.inc'
 entry start
-                ; PlaySound Enum
-                SND_SYNC        = 00000000h
-                SND_ASYNC       = 00000001h
-                SND_NODEFAULT   = 00000002h
-                SND_MEMORY      = 00000004h
-                SND_ALIAS       = 00010000h
-                SND_FILENAME    = 00020000h
-                SND_RESOURCE    = 00040004h
-                SND_ALIAS_ID    = 00110000h
-                SND_ALIAS_START = 00000000h
-                SND_LOOP        = 00000008h
-                SND_NOSTOP      = 00000010h
-                SND_VALID       = 0000001Fh
-                SND_NOWAIT      = 00002000h
-                SND_VALIDFLAGS  = 0017201Fh
-                SND_RESERVED    = 0FF000000h
-                SND_TYPE_MASK   = 00170007h
+            ; PlaySound Enum
+            SND_SYNC        = 00000000h
+            SND_ASYNC       = 00000001h
+            SND_NODEFAULT   = 00000002h
+            SND_MEMORY      = 00000004h
+            SND_ALIAS       = 00010000h
+            SND_FILENAME    = 00020000h
+            SND_RESOURCE    = 00040004h
+            SND_ALIAS_ID    = 00110000h
+            SND_ALIAS_START = 00000000h
+            SND_LOOP        = 00000008h
+            SND_NOSTOP      = 00000010h
+            SND_VALID       = 0000001Fh
+            SND_NOWAIT      = 00002000h
+            SND_VALIDFLAGS  = 0017201Fh
+            SND_RESERVED    = 0FF000000h
+            SND_TYPE_MASK   = 00170007h
 
-                ; IDs
-                ID_WINDOW       =       123
-                ID_STATIC       =       50
-                ID_START        =       200
-                ID_STOP         =       201
-                ID_5            =       305
-                ID_10           =       310
-                ID_15           =       315
-                ID_20           =       320
+            ; IDs
+            ID_WINDOW       =       123
+            ID_STATIC       =       50
+            ID_START        =       200
+            ID_STOP         =       201
+            ID_5            =       305
+            ID_10           =       310
+            ID_15           =       315
+            ID_20           =       320
 
 section '.data' data readable writeable
-                hwnd           dd       ?
+            hwnd           dd       ?
 
-                timerText      rb       32
-                titleText      rb       64
-                second         dd       0
-                minute         dd       0
-                hour           dd       0
-                timer_running  db       FALSE
+            timerText      rb       32
+            titleText      rb       32
+            second         dd       0
+            minute         dd       0
+            hour           dd       0
+            timer_running  db       FALSE
 
-                sound          db       'beep.wav',0
+            sound          db       'beep.wav',0
 
-                threadID       dd       ?
-                hThread        dd       0
-                somevar        dd       1
-                hdc            dd       ?
-                ps             PAINTSTRUCT
+            threadID       dd       ?
+            hThread        dd       0
+            somevar        dd       1
+            hdc            dd       ?
+            ps             PAINTSTRUCT
 
 section '.code' code readable executable
 
-start:          invoke  GetModuleHandle,0
-                invoke  DialogBoxParam,eax,123,HWND_DESKTOP,DialogProc,0
-                invoke  ExitProcess,0
+start:      invoke  GetModuleHandle,0
+            invoke  DialogBoxParam,eax,123,HWND_DESKTOP,DialogProc,0
+            invoke  ExitProcess,0
 
-ThreadProc:     push    ebp
-                mov     ebp,esp
+ThreadProc:
+            mov     [timerText+6],':'
+            mov     [timerText+12],':'
+.loop:
+            mov     eax, [hour]
+            mov     ecx, 10
+            xor     edx, edx
+            div     ecx
 
-.loop:          cinvoke wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
-                invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
-                invoke  Sleep,1000
-                dec     [second]
-                cmp     [hour],0
-                jne      .running
-                cmp     [minute],0
-                jne      .running
-                cmp     [second],-1
-                je      .timer_done
-.running:       cmp     [second],-1
-                jne     .skip
-                mov     [second],59
-                dec     [minute]
-                cmp     [minute],-1
-                jne     .skip
-                mov     [minute],59
-                dec     [hour]
-.skip:          cinvoke wsprintf,timerText,'%02i:%02i:%02i',[hour],[minute],[second]
-                invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
-                jmp     .loop
+            add     al, '0' ;tens
+            add     dl, '0' ;ones
 
-.timer_done:    invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
+            mov     [timerText+2], al
+            mov     [timerText+4], dl
 
-                mov     esp,ebp
-                pop     ebp
-                ret
+            mov     eax, [minute]
+            mov     ecx, 10
+            xor     edx, edx
+            div     ecx
 
+            add     al, '0' ;tens
+            add     dl, '0' ;ones
+
+            mov     [timerText+8], al
+            mov     [timerText+10], dl
+
+            mov     eax, [second]
+            mov     ecx, 10
+            xor     edx, edx
+            div     ecx
+
+            add     al, '0' ;tens
+            add     dl, '0' ;ones
+
+            mov     [timerText+14], al
+            mov     [timerText+16], dl
+           
+            invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
+            invoke  Sleep,1000
+
+            dec     [second]
+            jns     ._dec 
+            mov     [second],59
+            dec     [minute]
+            jns     ._dec
+            mov     [minute],59
+            dec     [hour]
+
+._dec:      mov     eax, [hour]
+            or      eax, [minute]
+            or      eax, [second]
+            jnz     .loop
+
+            invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
+            ret
 
 proc DialogProc hwnddlg,msg,wparam,lparam
-                push    ebx esi edi
-                cmp     [msg],WM_INITDIALOG
-                je      .wminitdialog
-                cmp     [msg],WM_COMMAND
-                je      .wmcommand
-                cmp     [msg],WM_PAINT
-                je      .wmpaint
-                cmp     [msg],WM_CLOSE
-                je      .wmclose
-                xor     eax,eax
-                jmp     .finish
-.wmcommand:     cmp     [wparam],BN_CLICKED shl 16 + ID_5
-                jne     .c10
-                mov     eax,5
-                call    SetupTimer
-                jmp     .exit
-.c10:           cmp     [wparam],BN_CLICKED shl 16 + ID_10
-                jne     .c15
-                mov     eax,10
-                call    SetupTimer
-                jmp     .exit
-.c15:           cmp     [wparam],BN_CLICKED shl 16 + ID_15
-                jne     .c20
-                mov     eax,15
-                call    SetupTimer
-                jmp     .exit
-.c20:           cmp     [wparam],BN_CLICKED shl 16 + ID_20
-                mov     eax,20
-                call    SetupTimer
-                jmp     .exit
-
-.wmpaint:       invoke  BeginPaint,[hwnd],ps
-                cmp     [timer_running],TRUE
-                jne     .p3
-                mov     [hdc],eax
-                invoke  TextOut,[hdc],5,5,timerText,15
-.p3:            invoke  EndPaint, [hwnd], ps
-                jmp     .exit
-
-.wminitdialog:  mov     eax,[hwnddlg]
-                mov     [hwnd],eax
-                jmp     .exit
-
-.wmclose:       invoke  EndDialog,[hwnddlg],0
-.exit:          mov     eax,1
-.finish:        pop     edi esi ebx
-                ret
-
-
-
+            push    ebx esi edi
+      ; Window Message
+            cmp     [msg],WM_INITDIALOG
+            je      .wminitdialog
+            cmp     [msg],WM_COMMAND
+            je      .wmcommand
+            cmp     [msg],WM_PAINT
+            je      .wmpaint
+            cmp     [msg],WM_CLOSE
+            je      .wmclose
+            xor     eax,eax
+            jmp     .finish
+      ; Select Button
+.wmcommand: cmp     [wparam],BN_CLICKED shl 16 + ID_5
+            jne     .c10
+            mov     eax,5
+            call    SetupTimer
+            jmp     .exit
+.c10:       cmp     [wparam],BN_CLICKED shl 16 + ID_10
+            jne     .c15
+            mov     eax,10
+            call    SetupTimer
+            jmp     .exit
+.c15:       cmp     [wparam],BN_CLICKED shl 16 + ID_15
+            jne     .c20
+            mov     eax,15
+            call    SetupTimer
+            jmp     .exit
+.c20:       cmp     [wparam],BN_CLICKED shl 16 + ID_20
+            mov     eax,20
+            call    SetupTimer
+            jmp     .exit
+      ; Draw
+.wmpaint:   invoke  BeginPaint,[hwnd],ps
+            cmp     [timer_running],TRUE
+            jne     .p3
+            mov     [hdc],eax
+            invoke  TextOut,[hdc],5,5,timerText,15
+.p3:        invoke  EndPaint,[hwnd],ps
+            jmp     .exit
+.wminitdialog:
+            mov     eax,[hwnddlg]
+            mov     [hwnd],eax
+            jmp     .exit
+.wmclose:   invoke  EndDialog,[hwnddlg],0
+.exit:      mov     eax,1
+.finish:    pop     edi esi ebx
+            ret
+                
 endp
 
 ; ==============
@@ -145,17 +168,19 @@ endp
 ; --------------
 ; eax: minutes
 ; --------------
-SetupTimer:     mov     [hour],0
-                mov     [minute],eax
-                mov     [second],0
-                invoke  TerminateThread,[hThread],0
-                invoke  CreateThread,0,0,ThreadProc,0,0,threadID
-                mov     [hThread],eax
-                mov     [timer_running],TRUE
-                cinvoke wsprintf,titleText,'%d minutes',[minute]
-                invoke  SetWindowText,[hwnd],titleText
-                ret
+SetupTimer: mov     [hour],0
+            mov     [minute],eax
+            mov     [second],0
+            invoke  TerminateThread,[hThread],0
+            invoke  CreateThread,0,0,ThreadProc,0,0,threadID
+            mov     [hThread],eax
+            mov     [timer_running],TRUE
 
+            cinvoke wsprintf,titleText,'%d minutes',[minute]
+
+            invoke  SetWindowText,[hwnd],titleText
+            ret
+                
 section '.idata' import data readable writeable
 
 library kernel32,'kernel32.dll',\
