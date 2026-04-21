@@ -12,7 +12,7 @@
         mem     rb  0xff
 
         cmdRun  db ' && ',0
-        cmdFasm db 'fasm.exe ',0
+        cmdFasm db 'cmd /c fasm.exe ',0
         cmdLine db '                                                      '
                 db '                                                      '
                 db '                                                      ',0
@@ -165,6 +165,7 @@ execute_cmd:
         inc     edi
         test    al, al
         jnz     .sl3
+
         dec     edi
         dec     edi
         mov     [edi], byte 'e'
