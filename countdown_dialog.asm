@@ -1,7 +1,7 @@
 ; Stopwatch Dialog
 
 format PE GUI 4.0
-include 'win32wx.inc'
+include 'win32w.inc'
 entry start
             ; PlaySound Enum
             SND_SYNC        = 00000000h
@@ -21,6 +21,8 @@ entry start
             SND_RESERVED    = 0FF000000h
             SND_TYPE_MASK   = 00170007h
 
+            TIMER_ID        = 123
+
             ; IDs
             ID_WINDOW       =       123
             ID_STATIC       =       50
@@ -35,7 +37,7 @@ section '.data' data readable writeable
             hwnd           dd       ?
 
             timerText      rb       32
-            titleText      rb       32
+            titleText      db       '   Minutes',0
             second         dd       0
             minute         dd       0
             hour           dd       0
@@ -44,9 +46,6 @@ section '.data' data readable writeable
             sound          db       'beep.wav',0
 
             threadID       dd       ?
-            hThread        dd       0
-            somevar        dd       1
-            hdc            dd       ?
             ps             PAINTSTRUCT
 
 section '.code' code readable executable
@@ -55,10 +54,47 @@ start:      invoke  GetModuleHandle,0
             invoke  DialogBoxParam,eax,123,HWND_DESKTOP,DialogProc,0
             invoke  ExitProcess,0
 
-ThreadProc:
+proc DialogProc hwnddlg,msg,wparam,lparam
+            push    ebx esi edi
+      ; Window Message
+            cmp     [msg],WM_INITDIALOG
+            je      .wminitdialog
+            cmp     [msg],WM_COMMAND
+            je      .wmcommand
+            cmp     [msg],WM_PAINT
+            je      .wmpaint
+            cmp     [msg],WM_CLOSE
+            je      .wmclose
+            cmp     [msg],WM_TIMER
+            je      .wmtimer
+            xor     eax,eax
+            jmp     .finish
+      ; Select Button
+.wmcommand: cmp     [wparam],BN_CLICKED shl 16 + ID_5
+            jne     .c10
+            mov     eax,5
+            call    SetupTimer
+            jmp     .exit
+.c10:       cmp     [wparam],BN_CLICKED shl 16 + ID_10
+            jne     .c15
+            mov     eax,10
+            call    SetupTimer
+            jmp     .exit
+.c15:       cmp     [wparam],BN_CLICKED shl 16 + ID_15
+            jne     .c20
+            mov     eax,15
+            call    SetupTimer
+            jmp     .exit
+.c20:       cmp     [wparam],BN_CLICKED shl 16 + ID_20
+            mov     eax,20
+            call    SetupTimer
+            jmp     .exit
+      ; Timer
+.wmtimer:
+            cmp     [wparam],TIMER_ID
+            jne     .exit
             mov     [timerText+6],':'
             mov     [timerText+12],':'
-.loop:
             mov     eax, [hour]
             mov     ecx, 10
             xor     edx, edx
@@ -93,7 +129,6 @@ ThreadProc:
             mov     [timerText+16], dl
            
             invoke  InvalidateRect,[hwnd],NULL,1 ; Trigger WM_PAINT
-            invoke  Sleep,1000
 
             dec     [second]
             jns     ._dec 
@@ -106,57 +141,25 @@ ThreadProc:
 ._dec:      mov     eax, [hour]
             or      eax, [minute]
             or      eax, [second]
-            jnz     .loop
+            jnz     .exit
 
-            invoke  PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
-            ret
+            invoke KillTimer,[hwnd],TIMER_ID
+            invoke PlaySound,sound,NULL,SND_ASYNC or SND_FILENAME
 
-proc DialogProc hwnddlg,msg,wparam,lparam
-            push    ebx esi edi
-      ; Window Message
-            cmp     [msg],WM_INITDIALOG
-            je      .wminitdialog
-            cmp     [msg],WM_COMMAND
-            je      .wmcommand
-            cmp     [msg],WM_PAINT
-            je      .wmpaint
-            cmp     [msg],WM_CLOSE
-            je      .wmclose
-            xor     eax,eax
-            jmp     .finish
-      ; Select Button
-.wmcommand: cmp     [wparam],BN_CLICKED shl 16 + ID_5
-            jne     .c10
-            mov     eax,5
-            call    SetupTimer
-            jmp     .exit
-.c10:       cmp     [wparam],BN_CLICKED shl 16 + ID_10
-            jne     .c15
-            mov     eax,10
-            call    SetupTimer
-            jmp     .exit
-.c15:       cmp     [wparam],BN_CLICKED shl 16 + ID_15
-            jne     .c20
-            mov     eax,15
-            call    SetupTimer
-            jmp     .exit
-.c20:       cmp     [wparam],BN_CLICKED shl 16 + ID_20
-            mov     eax,20
-            call    SetupTimer
-            jmp     .exit
       ; Draw
 .wmpaint:   invoke  BeginPaint,[hwnd],ps
             cmp     [timer_running],TRUE
             jne     .p3
-            mov     [hdc],eax
-            invoke  TextOut,[hdc],5,5,timerText,15
+            invoke  TextOut,eax,5,5,timerText,15
 .p3:        invoke  EndPaint,[hwnd],ps
             jmp     .exit
 .wminitdialog:
             mov     eax,[hwnddlg]
             mov     [hwnd],eax
             jmp     .exit
-.wmclose:   invoke  EndDialog,[hwnddlg],0
+.wmclose:   
+            invoke KillTimer,[hwnd],TIMER_ID
+            invoke EndDialog,[hwnddlg],0
 .exit:      mov     eax,1
 .finish:    pop     edi esi ebx
             ret
@@ -171,14 +174,22 @@ endp
 SetupTimer: mov     [hour],0
             mov     [minute],eax
             mov     [second],0
-            invoke  TerminateThread,[hThread],0
-            invoke  CreateThread,0,0,ThreadProc,0,0,threadID
-            mov     [hThread],eax
+            invoke  SetTimer,[hwnd],TIMER_ID,1000,0
+
             mov     [timer_running],TRUE
 
-            cinvoke wsprintf,titleText,'%d minutes',[minute]
+            mov     eax, [minute]
+            mov     ecx, 10
+            xor     edx, edx
+            div     ecx
 
-            invoke  SetWindowText,[hwnd],titleText
+            add     al, '0' ;tens
+            add     dl, '0' ;ones
+
+            mov     [titleText+0],al
+            mov     [titleText+1],dl
+
+            invoke  SetWindowTextA,[hwnd],titleText
             ret
                 
 section '.idata' import data readable writeable
