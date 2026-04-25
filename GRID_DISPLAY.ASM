@@ -1,4 +1,4 @@
-;       ASCII Grid v1.0 - (C) 2026 Simlx
+;       ASCII Grid Display - (C) 2026 Simlx
 ;       Program to draw an ASCII grid using Win32 GDI functions.
 ;       The mouse cursor cell is highlighted
 
@@ -42,7 +42,6 @@
         rect       RECT         ; RECT for FillRect
 
         cursorpos  POINT
-
 .code
 start:
         invoke  GetModuleHandle,0
@@ -56,7 +55,7 @@ proc winproc hwnddlg,msg,wparam,lparam
         je      .wminitdialog
         cmp     [msg],  WM_COMMAND
         je      .wmcommand
-        cmp     [msg],   WM_MOUSEMOVE
+        cmp     [msg],  WM_MOUSEMOVE
         je      .wmposchanged
         cmp     [msg],  WM_PAINT
         je      .paint
@@ -86,6 +85,9 @@ proc winproc hwnddlg,msg,wparam,lparam
                 BMP_SIZE,BMP_SIZE
         mov     [bmp],eax
         invoke  EndPaint,[hwnd],ps
+
+        ; Set bkmode for text background color
+        invoke  SetBkMode,[memdc],TRANSPARENT
 
         ; Setup brushes
         invoke  CreateSolidBrush,0x00ffff00
@@ -127,8 +129,6 @@ proc winproc hwnddlg,msg,wparam,lparam
         mov     [A],0
         mov     esi,txt
 
-        invoke  SetBkMode,[memdc],TRANSPARENT
-
         ; Setup ASCII Box
         mov     [B],16
         mov     eax,[B]
@@ -136,9 +136,6 @@ proc winproc hwnddlg,msg,wparam,lparam
         mov     [rect.top],0
         mov     [rect.right],eax
         mov     [rect.bottom],eax
-
-        mov     [gx],0
-        mov     [gy],0
 
         ; Calculate Select Cell X
         mov     eax,[cursorpos.x]
@@ -155,6 +152,8 @@ proc winproc hwnddlg,msg,wparam,lparam
         div     ecx
         mov     [sy],eax
 
+        mov     [gx],0
+        mov     [gy],0
 .LYasc:
 .LXasc:
         inc     [gx]
@@ -194,11 +193,6 @@ proc winproc hwnddlg,msg,wparam,lparam
         mov     [rect.right], eax
         mov     [rect.left],  0
 
-        ;mov     eax,[gy]
-        ;mov     ebx,GRID_W
-        ;mul     ebx
-        ;add     eax,txt
-
         mov     [gx],0
         inc     [gy]
         cmp     [gy],GRID_H
@@ -206,9 +200,8 @@ proc winproc hwnddlg,msg,wparam,lparam
 
         invoke  BitBlt,[hdc],0,0,BMP_SIZE,BMP_SIZE,\
                 [memdc],0,0,SRCCOPY
-        ; Destroy DC
-        invoke  EndPaint,[hwnd],ps
 
+        invoke  EndPaint,[hwnd],ps
         jmp     .exit
 .wmclose:
         invoke  DeleteObject,[bmp]
