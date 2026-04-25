@@ -1,3 +1,7 @@
+;       ASCII Grid v1.0 - (C) 2026 Simlx
+;       Program to draw an ASCII grid using Win32 GDI functions.
+;       The mouse cursor cell is highlighted
+
         format pe gui 4.0
         include 'win32wx.inc'
 
