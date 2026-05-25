@@ -1,4 +1,4 @@
-;       ASCII Grid Display - (C) 2026 Simlx
+;       ASCII Grid Display - (C) 2026 slixenfeld
 ;       Program to draw an ASCII grid using Win32 GDI functions.
 ;       The mouse cursor cell is highlighted
 
@@ -10,7 +10,6 @@
 
         BMP_SIZE = 500
 .data
-        mem     rb  0xff
         txt     rb  4096
 
         buffer  rb  4096
